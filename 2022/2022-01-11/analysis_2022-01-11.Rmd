@@ -245,7 +245,7 @@ for_plotting <- full_dataset %>%
     colony_n_rel = colony_max/norm) 
 
 # Let's plot the data!
-for_plotting %>% 
+p<- for_plotting %>% 
   ggplot() +
   
   # Plotting the hexagon legend
@@ -335,7 +335,7 @@ for_plotting %>%
   NULL
 
 # Saving the graph
-ggsave(filename = 'final_graph.pdf', width = 7, height = 4)
+ggsave(filename = 'final_graph.pdf', p, width = 7, height = 4)
 
 ```
 
