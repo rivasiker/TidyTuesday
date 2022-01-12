@@ -335,7 +335,7 @@ for_plotting %>%
   NULL
 
 # Saving the graph
-ggsave(filename = 'bees.pdf', width = 7, height = 4)
+ggsave(filename = 'final_graph.pdf', width = 7, height = 4)
 
 ```
 
