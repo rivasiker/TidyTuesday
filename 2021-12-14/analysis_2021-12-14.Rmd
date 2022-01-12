@@ -1,0 +1,94 @@
+---
+title: "TidyTuesday week 1"
+author: "Iker Rivas-González"
+date: "1/1/2022"
+output: html_document
+---
+
+```{r}
+
+library(tidyverse)
+library(tidytuesdayR)
+library(ggwordcloud)
+
+tuesdata <- tidytuesdayR::tt_load('2021-12-14')
+lyrics <- tuesdata$lyrics
+
+coca <- read_csv('wordFrequency_COCAcorpus.csv')
+
+
+```
+
+
+
+```{r}
+
+all_words <- unlist(str_split(lyrics$line, ' ')) %>% 
+  lapply(function(x) tryCatch(tolower(x), error = function(e) NA)) %>% 
+  sapply(`[[`, 1)  %>% 
+  str_remove_all("[\\?\\.\\{\\}\\,\\[\\]\\(\\)\"]") %>%
+  table() %>% 
+  as_tibble() %>% 
+  arrange(desc(n)) 
+
+colnames(all_words) <- c('lemma', 'n') 
+
+
+set.seed(0)
+all_words %>% 
+  full_join(coca, 'lemma') %>% 
+  group_by(lemma) %>% 
+  summarise(n = min(n), rank = min(rank)) %>% 
+  arrange(desc(n)) %>% 
+  filter(n > 20) -> a
+  ggplot() +
+  geom_text_wordcloud_area(aes(label = lemma, size = n, color = log(rank))) +
+  scale_size_area(max_size = 24) +
+  theme_minimal() +
+  scale_color_continuous(type = 'viridis')
+
+library(wordcloud2)
+  
+all_words %>% 
+  full_join(coca, 'lemma') %>% 
+  group_by(lemma) %>% 
+  summarise(n = min(n), rank = min(rank)) %>% 
+  arrange(desc(n)) %>% 
+  filter(n > 10) %>% 
+  transmute(word = lemma, freq = n)-> a
+
+wordcloud2(data=a, )
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

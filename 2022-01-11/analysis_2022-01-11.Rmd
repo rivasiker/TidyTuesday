@@ -1,0 +1,355 @@
+---
+title: "TidyTuesday week 1"
+author: "Iker Rivas-González"
+date: "11/1/2022"
+output: html_document
+---
+
+```{r}
+
+library(tidyverse)
+library(tidytuesdayR)
+library(showtext)
+font_add_google("Montserrat", "Montserrat")
+showtext_auto()
+
+
+# Get the Data
+
+# Read in with tidytuesdayR package 
+# Install from CRAN via: install.packages("tidytuesdayR")
+# This loads the readme and all the datasets for the week of interest
+
+# Either ISO-8601 date or year/week works!
+
+tuesdata <- tidytuesdayR::tt_load('2022-01-11')
+
+colony <- tuesdata$colony
+
+stressor <- tuesdata$stressor
+
+```
+
+```{r}
+
+library(geojsonio)
+
+# Download the Hexagones boundaries at geojson format here: https://team.carto.com/u/andrew/tables/andrew.us_states_hexgrid/public/map
+
+# Load this file. (Note: I stored in a folder called DATA)
+spdf <- geojson_read("./us_states_hexgrid.geojson",  what = "sp")
+
+# Bit of reformating
+spdf@data = spdf@data %>%
+  mutate(google_name = gsub(" \\(United States\\)", "", google_name))
+
+```
+
+
+```{r}
+
+library(broom)
+spdf@data = spdf@data %>% mutate(google_name = gsub(" \\(United States\\)", "", google_name))
+spdf_fortified <- tidy(spdf, region = "google_name") %>% 
+  filter(id != 'District of Columbia')
+
+# Calculate the centroid of each hexagon to add the label:
+library(rgeos)
+centers <- cbind.data.frame(data.frame(gCentroid(spdf, byid=TRUE), id=spdf@data$iso3166_2))
+ 
+# Now I can plot this shape easily as described before:
+ggplot() +
+  geom_polygon(data = spdf_fortified, aes( x = long, y = lat, group = group), fill="skyblue", color="white") +
+  geom_text(data=centers, aes(x=x, y=y, label=id)) +
+  theme_void() +
+  coord_map()
+
+```
+
+
+
+
+
+```{r}
+
+# This function divides a hexagon into 24 triangles
+
+triangle <- function(x) {
+  
+  # this is for reordering the groups of the triangles
+  lookup <- setNames(1:24, 
+                     c(13, 1, 8, 2, 11, 3, 12, 4, 10, 7, 19, 22, 
+                       16, 24, 15, 23, 14, 20, 17, 5, 9, 6, 18, 21)
+  )
+  lookup_2 <- setNames( c(21, 22, 3, 4, 8, 12, 16, 20, 19, 23, 24, 18, 17, 13, 
+                         9, 5, 1, 2, 6, 7, 11, 15, 14, 10), 1:24
+                       
+  )
+  
+  # This is a (rather ugly) chunk for calculating the triangle boundaries
+  dat <- rbind(
+    x[1,1:2],
+    tibble(
+      long = x[[1,1]]-(x[[1,1]]-x[[2,1]])/2,
+      lat = x[[1,2]]-(x[[1,2]]-x[[2,2]])/2,
+      ),
+    tibble(long = x[[1,1]], lat = x[[2,2]]),
+    x[1,1:2]
+    )
+  dat_2 <- 
+    rbind(
+      mutate(dat, group = 1),
+      mutate(dat, 
+             long = long-(x[[1,1]]-x[[2,1]])/2,
+             lat = lat-(x[[1,2]]- x[[2,2]])/2,
+             group = 2),
+      mutate(dat, 
+             long = long-(x[[1,1]]-x[[2,1]])/2,
+             lat = lat-(x[[1,2]]- x[[2,2]])*1.5,
+             group = 3),
+      mutate(dat, 
+             long = long-(x[[1,1]]-x[[2,1]])/2,
+             lat = lat-(x[[1,2]]- x[[2,2]])*2.5,
+             group = 4),
+      mutate(dat, 
+             lat = lat-(x[[1,2]]- x[[2,2]]),
+             group = 5),
+      mutate(dat, 
+             lat = lat-(x[[1,2]]- x[[2,2]])*2,
+             group = 6),
+      mutate(dat, 
+             lat = lat-(x[[1,2]]- x[[2,2]])*3,
+             group = 7),
+      
+      mutate(dat, 
+             long = -long+(x[[1,1]])*2-
+               (x[[1,1]]-x[[2,1]])/2,
+             lat = lat-(x[[1,2]]- x[[2,2]])/2,
+             group = 8),
+      mutate(dat, 
+             long = -long+(x[[1,1]])*2-
+               (x[[1,1]]-x[[2,1]])/2,
+             lat = lat-(x[[1,2]]- x[[2,2]])*1.5,
+             group = 9),
+      mutate(dat, 
+             long = -long+(x[[1,1]])*2-
+               (x[[1,1]]-x[[2,1]])/2,
+             lat = lat-(x[[1,2]]- x[[2,2]])*2.5,
+             group = 10),
+      mutate(dat, 
+             long = -long+(x[[1,1]])*2-
+               (x[[1,1]]-x[[2,1]]),
+             lat = lat-(x[[1,2]]- x[[2,2]]),
+             group = 11),
+      mutate(dat, 
+             long = -long+(x[[1,1]])*2-
+               (x[[1,1]]-x[[2,1]]),
+             lat = lat-(x[[1,2]]- x[[2,2]])*2,
+             group = 12)
+      )
+  dat_2 <- rbind(
+    dat_2,
+    mutate(
+      dat_2,
+      long = x[[1,1]]*2-long,
+      group = group+12
+    )
+  ) %>% 
+    mutate(
+      lat = (lat-x[[1,2]])*0.02+lat,
+      group = lookup[as.character(group)],
+      group = lookup_2[as.character(group)]
+    )
+
+  dat_2
+}
+
+ # Let's try it out using the data for Alabama
+Alabama <- spdf_fortified %>% 
+  filter(id == 'Alabama')  %>% 
+  triangle() 
+Alabama <-  colony %>% 
+  filter(
+    year %in% c('2015', '2016', '2017', '2018', '2020'), 
+    state == 'Alabama') %>% 
+  mutate(group = 1:20) %>% 
+  full_join(Alabama, by = c('group')) 
+Alabama %>% 
+  ggplot() +
+  geom_polygon(aes( x = long, y = lat, 
+                    group = group), 
+               color="white") +
+  geom_text(aes(x = long, y = lat, label = months),
+            color = 'white',
+           data = mutate(group_by(Alabama, group), long = mean(long), lat = mean(lat)))
+
+# It works! 
+
+```
+
+
+```{r}
+
+#Let's apply the function to the whole dataset
+spdf_fortified_triangle <- spdf_fortified %>% 
+  group_by(id) %>% 
+  group_modify(~triangle(.x)) %>% 
+  unite('group_2', c(id, group), remove = F) %>% 
+  mutate(state = id)
+
+# We can now merge the triangle coordinates with the colony data
+state_lookup <- setNames(state.abb, state.name)
+full_dataset <- colony %>% 
+  filter(year %in% c('2015', '2016', '2017', '2018', '2020')) %>% 
+  group_by(state) %>% 
+  mutate(group = 1:20) %>% 
+  full_join(spdf_fortified_triangle, by = c('group', 'state')) %>% 
+  mutate(abb = state_lookup[state])
+
+
+```
+
+
+
+```{r}
+
+# We will save some coordinates based on Hawaii for plotting the legend
+Hawaii <- filter(spdf_fortified, id == 'Hawaii') %>% 
+  mutate(
+    long = long+62,
+    lat = lat+1
+  )
+Hawaii_boundaries <- tibble(
+  x = range(Hawaii$long)[1]+seq(1, 8, 2)*(diff(range(Hawaii$long))/8),
+  y = max(Hawaii$lat) + 1,
+  yend = min(Hawaii$lat), 
+  month = c('Jan-Mar', 'Apr-Jun', 'Jul-Sep', 'Oct-Dec')
+)
+Hawaii_boundaries_2 <- tibble(
+  y = range(Hawaii$lat)[1]+seq(2, 6, 1)*(diff(range(Hawaii$lat))/8),
+  x = max(Hawaii$long),
+  xend = min(Hawaii$long) - c(1, 3.7, 1, 3.7, 1),
+  year = c(2020, 2018, 2017, 2016, 2015)
+)
+
+# We can filter only the interesting data and normalize the maximum number of
+# colonies by the max number of colonies in Jan-Mar 2015 per state
+for_plotting <- full_dataset %>% 
+  filter(!is.na(long), state != 'District of Columbia') %>% 
+  group_by(state, year) %>%
+  mutate(
+    norm = unique(colony_max[months == 'January-March'])) %>% 
+  group_by(state) %>% 
+  mutate(
+    norm = norm[year == '2015'][1],
+    colony_n_rel = colony_max/norm) 
+
+# Let's plot the data!
+for_plotting %>% 
+  ggplot() +
+  
+  # Plotting the hexagon legend
+  geom_text(aes(x = xend-0.5, y = y, label = year),
+            hjust = 1, size = 2, family = 'Montserrat',
+            data = Hawaii_boundaries_2) +
+  geom_text(aes(x = x, y = y+0.1, label = month),
+            hjust = 1, size = 2, angle = 90+180+40, 
+            family = 'Montserrat',
+            data = Hawaii_boundaries) +
+  geom_polygon(aes( x = long+62, y = lat+1, 
+                    group = group_2,
+                    fill = ifelse(!is.na(colony_n_rel), 1, NA)),
+               color = 'white',
+               size = 0.2,
+               data = filter(for_plotting, state == 'Hawaii')) +
+  geom_polygon(aes( x = long, y = lat, group = group), 
+               fill="transparent", color="black",
+               data = Hawaii) +
+  geom_segment(aes(x = x, xend = x, y = y, yend = yend),
+               size = 0.3,
+               data = Hawaii_boundaries) +
+  geom_segment(aes(x = x, xend = xend, y = y, yend = y),
+               size = 0.3,
+               data = Hawaii_boundaries_2) +
+  
+  # Plotting the hexbin map
+  geom_polygon(aes( x = long, y = lat, 
+                    group = group_2,
+                    fill = (colony_n_rel)),
+               color = 'white',
+               size = 0.2) +
+  geom_polygon(aes( x = long, y = lat, group = group), 
+               fill="transparent", color="black",
+               data = spdf_fortified) +
+  
+  # Plotting of the state name
+  geom_text(aes(x=long-2.7, y=(lat-1)*1.01, label=state_lookup[state]),
+            size = 1.7, color = 'black', family = 'Montserrat',
+            data = summarize(group_by(for_plotting, state), 
+                             long = max(long),
+                             lat = max(lat))) +
+  
+  # Plotting the title and sub-title
+  geom_text(aes(x=-105, y=59, label=label),
+            size = 4, color = 'black', hjust = 0.5,
+            family = 'Montserrat', fontface = "bold",
+            data = tibble(label = 'Seasonality in the number of bee colonies')) +
+  geom_text(aes(x=-105, y=y, label=label),
+            size = 3, color = 'black', hjust = 0.5, vjust = 1,
+            family = 'Montserrat',
+            data = tibble(
+              label = c('The number of bee colonies in the US changes with the',
+                        'seasons depending on the state. In some northern states,',
+                        'the number of bees increases more than two-fold in spring,',
+                        'and their numbers are maintained until winter. In some',
+                        'warmer southern states, such as California or Texas,',
+                        'the number of colonies drops during the hottest',
+                        'months, recovering only with milder temperatures.'),
+              y = 58:52)) +
+  
+  # Plotting the credits
+  geom_text(aes(x=-143.5, y=58.7, label=label),
+            size = 2, color = 'black', hjust = 0,
+            family = 'Montserrat', fontface = "bold",
+            data = tibble(label = 'Data from USDA\nGraph by @irg_bio')) +
+  
+  # Fixing the coordinates for the map
+  coord_map()  +
+  
+  # Changing the color scale
+  colorspace::scale_fill_continuous_divergingx(
+    name = 'Maximum number\nof bee colonies\nrelative to\nJan-Mar 2015\n(log scale)',
+    palette = "Temps",
+    na.value = 'white',
+    trans = 'log',
+    rev = T,
+    breaks = c(2.72, 1, 0.37, 0.14)) +
+  
+  # Adding additional theme options
+  theme_void()  +
+  theme(legend.position = c(0.105, 0.41),
+        legend.title = element_text(size = 6, family = 'Montserrat'),
+        legend.key.size = unit(15, 'pt'),
+        legend.text = element_text(size = 6, family = 'Montserrat')
+        ) +
+  NULL
+
+# Saving the graph
+ggsave(filename = 'bees.pdf', width = 7, height = 4)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
