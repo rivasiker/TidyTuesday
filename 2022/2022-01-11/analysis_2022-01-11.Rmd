@@ -1,5 +1,5 @@
 ---
-title: "TidyTuesday week 1"
+title: "TidyTuesday week 2"
 author: "Iker Rivas-González"
 date: "11/1/2022"
 output: html_document
