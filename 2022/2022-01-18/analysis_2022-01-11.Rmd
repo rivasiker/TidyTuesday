@@ -1,0 +1,179 @@
+---
+title: "TidyTuesday week 3"
+author: "Iker Rivas-González"
+date: "11/1/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Load the data:
+
+```{r}
+
+library(tidyverse)
+library(tidytuesdayR)
+library(showtext)
+library(ggthemes)
+font_add_google("Open Sans", "opensans")
+showtext_auto()
+
+
+# Get the Data
+
+# Read in with tidytuesdayR package 
+# Install from CRAN via: install.packages("tidytuesdayR")
+# This loads the readme and all the datasets for the week of interest
+
+# Either ISO-8601 date or year/week works!
+
+tuesdata <- tidytuesdayR::tt_load('2022-01-18')
+
+chocolate <- tuesdata$chocolate
+
+```
+
+Preliminary analyses:
+
+```{r}
+
+chocolate %>% 
+  mutate(
+    cocoa_percent = as.numeric(str_remove_all(cocoa_percent, '\\%')),
+    bin = cut(
+      rating, 
+      breaks = unique(quantile(rating, probs = seq(0, 1, by = 1/6))),
+      include.lowest=TRUE)) %>% 
+  group_by(bin) %>% 
+  tally()
+
+
+sum_choc <- chocolate %>% 
+  mutate(
+    cocoa_percent = as.numeric(str_remove_all(cocoa_percent, '\\%')),
+    bin = cut(
+      rating, 
+      breaks = unique(quantile(rating, probs = seq(0, 1, by = 1/6))),
+      include.lowest=TRUE)) %>% 
+  group_by(bin) %>% 
+  summarise(
+    min = min(rating),
+    max = max(rating),
+    cocoa_min = min(cocoa_percent),
+    cocoa_max = max(cocoa_percent),
+    cocoa_mean = mean(cocoa_percent),
+    cocoa_sd = sd(cocoa_percent),
+    n = n()
+  ) 
+
+sum_choc
+
+```
+
+Let's plot something interesting!
+
+```{r}
+
+# Save the dataframe for plotting
+a <- chocolate %>% 
+  mutate(
+    # Divide the ratings by quantiles
+    bin = cut(
+      rating, 
+      breaks = unique(quantile(rating, probs = seq(0, 1, by = 1/6))),
+      include.lowest=TRUE)) %>% 
+  # Extract all features per bin
+  group_by(bin) %>% 
+  summarise(
+    features = paste(most_memorable_characteristics, collapse = ', ')
+  ) %>% 
+  rowwise() %>% 
+  mutate(
+    features = str_split(features, ','),
+    x = list(str_remove_all(features, ' ')),
+  ) %>% 
+  select(-features) %>% 
+  group_by(bin) %>% 
+  unnest(x) %>% 
+  # Summarize the count of features
+  group_by(bin, x) %>% 
+  tally() %>% 
+  # Capitalize the features
+  mutate(
+    features = str_to_sentence(x),
+    features = ifelse(features == 'Driedfruit', 'Dried fruit', features)
+    )
+
+# Choose the top 4 most mentioned features per rating bin
+b <- a %>% 
+  group_by(bin) %>% 
+  arrange(bin, desc(n)) %>% 
+  top_n(4, wt = n) %>% 
+  ungroup() 
+# This is for re-ordering the factors
+c <- a %>% 
+  group_by(bin) %>% 
+  filter(features %in% b$features) %>% 
+  arrange(bin, desc(n)) %>% 
+  ungroup() 
+# Plot the figure
+a %>% 
+  group_by(bin, features) %>% 
+  top_n(1, wt = n) %>% 
+  group_by(bin) %>% 
+  # Filter and re-order the features
+  filter(features %in% b$features) %>% 
+  mutate(features = factor(features, rev(unique(c$features)))) %>% 
+  ggplot() +
+  # Plot background lines
+  geom_hline(aes(yintercept = features), color = 'grey') +
+  # Plot data
+  geom_point(aes(bin, features, size = n, fill = n), 
+             color = 'white', stroke = 2,
+             shape = 21) +
+  # Change theme
+  theme_few() +
+  scale_size_continuous(range = c(1, 12)) +
+  colorspace::scale_fill_continuous_sequential(
+    palette = "BrwnYl"
+    ) +
+  labs(
+    title = 'The most memorable characteristics of chocolate bars by rating',
+    subtitle = '#TidyTuesday (2022, w3) | Data: Flavors of Cacao | Graph by @irg_bio'
+    ) +
+  guides(
+    size = 'none',
+    fill = guide_colourbar(title = 'Number\nof times\nmentioned')
+    ) +
+  xlab('Rating (n = number of chocolate bars)') +
+  theme(
+    text = element_text(family = 'opensans'),
+    axis.title.y = element_blank(),
+    axis.title.x = element_text(
+      margin = margin(t = 10, r = 0, b = 0, l = 0),
+      size = 11
+    ),
+    plot.title = element_text(hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5, size = 11),
+    legend.title = element_text(size = 9)
+  ) +
+  scale_x_discrete(
+    labels = 
+      paste0(
+        c('1 to 2.75\n(n = ', '3\n(n = ', '3.25\n(n = ', '3.5\n(n = ', '3.75 and 4\n(n = '),
+        sum_choc$n,
+        rep(')', 5)
+        )
+    )
+
+ggsave('final_graph.pdf', width = 7.29, height = 4.75)
+
+
+```
+
+
+
+
+
+
+
