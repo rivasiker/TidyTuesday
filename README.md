@@ -9,6 +9,10 @@ project.
 Submissions
 ================
 
+## 2022-01-25
+
+![Table of board game info](2022/2022-01-25/final_graph.png)
+
 ## 2022-01-18
 
 ![Most mentioned features of chocolate bars](2022/2022-01-18/final_graph.png)
