@@ -1,7 +1,7 @@
 ---
 title: "TidyTuesday week 3"
 author: "Iker Rivas-González"
-date: "11/1/2022"
+date: "25/1/2022"
 output: html_document
 editor_options: 
   chunk_output_type: inline
@@ -13,10 +13,7 @@ Load the data:
 
 library(tidyverse)
 library(tidytuesdayR)
-library(showtext)
-library(ggthemes)
-font_add_google("Open Sans", "opensans")
-showtext_auto()
+library(gt)
 
 
 # Get the Data
@@ -36,25 +33,15 @@ boardgames <-
   full_join(ratings, details, by = 'id')
 
 ```
-
 ```{r}
 
-library(GGally)
-
-boardgames %>% 
-  dplyr::transmute(
-    average, 
-    yearpublished = log(yearpublished), 
-    minplayers, maxplayers, playingtime, minage
-    ) %>% 
-ggpairs()
-
-```
-```{r}
-
+# This chunk extracts the categories per game
 category <- boardgames %>% 
-  dplyr::select(name, boardgamecategory, bayes_average, thumbnail) %>% 
-  group_by(name, bayes_average, thumbnail) %>% 
+  dplyr::select(name, boardgamecategory, bayes_average, thumbnail, 
+                yearpublished, minplayers, maxplayers, playingtime) %>% 
+  group_by(name, bayes_average, thumbnail, yearpublished, 
+           minplayers, maxplayers, playingtime) %>% 
+  # Remove unwanted characters
   mutate(
     cat = str_remove_all(boardgamecategory, "\\'"),
     cat = str_remove_all(cat, "\\["),
@@ -62,35 +49,27 @@ category <- boardgames %>%
     cat = str_remove_all(cat, "\""),
     cat = str_replace_all(cat, "Childrens", "Children\\'s")
   ) %>% 
+  # Extract categories
   summarise(
     cat = str_split(cat, ', ')
   ) %>% 
-  unnest(cat)
-
-```
-
-
-
-```{r}
-
-category %>% 
-  group_by(cat) %>%
+  unnest(cat) %>% 
+  rowwise() %>% 
+  # Create players column
   mutate(
-    group_average = mean(bayes_average), 
-    n = n()
+    players = ifelse(minplayers==maxplayers, 
+                     as.character(minplayers), 
+                     paste0(c(minplayers, maxplayers), collapse = '-'))
   ) %>% 
-  top_n(1, bayes_average) %>% 
-  arrange(desc(n))
+  ungroup() %>% 
+  dplyr::select(-c(minplayers, maxplayers))
 
 ```
 
 
 ```{r}
 
-library(gt)
-
-
-
+# This is for the images
 img_name <- c(
   "https://czechgames.com/for-press/through-the-ages/through-the-ages-05.png",
   "https://images-cdn.fantasyflightgames.com/filer_public/8d/f8/8df8d3c5-ff36-4efe-83b6-d1383329902d/ti07_logo.jpg",
@@ -102,7 +81,6 @@ img_name <- c(
   "https://eljuegonauta.com/wp-content/uploads/2016/12/IMG_20161214_000027_HDR-e1485089428758.jpg",
   "https://www.board-game.co.uk/wp-content/uploads/2018/04/Azul-Board-Game-Review.jpg",
   "https://www.board-game.co.uk/wp-content/uploads/2018/10/Brass-Birmingham-Review.jpg",
-  
   "https://www.ultraboardgames.com/great-western-trail/gfx/logo.jpg",
   "https://boardgaming.com/wp-content/uploads/2012/04/Memoir-44-logo.jpg",
   "https://www.deepcomics.com/wp-content/uploads/2015/10/Android-netrunner-logo.png",
@@ -114,67 +92,101 @@ img_name <- c(
 
 
 
+# This is for creating the boxplots
 plots_dat <- category %>% 
+  # Group and summarize per category
   group_by(cat) %>%
   summarize(
-    group_average = mean(bayes_average), 
+    group_average = median(bayes_average), 
     n = n()
   ) %>% 
-  top_n(17) %>% 
+  # Get the top 17 categories with more games
+  top_n(17, n) %>% 
+  # Join info with whole dataset
+  # This is for removing all other categories
   left_join(category, by = "cat") %>% 
   group_by(cat) %>% 
+  # Calculate median per category
+  mutate(
+    med = median(bayes_average),
+    max = max(bayes_average)
+    ) %>% 
+  ungroup() %>% 
+  # Arrange by maximum value
+  arrange(desc(max)) %>% 
+  group_by(cat) %>% 
   dplyr::select(bayes_average) %>% 
+  # Create plot per row
   nest() %>% 
   rowwise() %>% 
   mutate(
     plots = list(
-      ggplot(data, aes(bayes_average)) +
-        geom_density(size = 5) +
-        scale_x_continuous(limits = c(5, 10)) +
+      ggplot(data, aes(x = 1, y = bayes_average)) +
+        geom_jitter(width = 0.4, alpha = 0.5, size = 5) +
+        geom_boxplot(size = 5, outlier.size = 4,
+                     outlier.shape = NA, color = 'red', alpha = 0.5) +
+        stat_summary(fun = "max", colour = "blue", size = 20, geom = "point") +
         theme_minimal() +
+        coord_flip(ylim = c(4.75, 8.511	)) +
         theme(
-          text=element_text(size=100),
+          text=element_text(size=150),
           axis.title = element_blank(),
           axis.text.y = element_blank()
           ))
   ) %>%
   ungroup() %>% 
+  # Remove these categories because the best game is the same as in 'Fantasy'
   filter(
     cat != 'Miniatures', 
     cat != 'Fighting',
     cat != 'Adventure'
   ) 
 
+
+
+
+
 gt_tab <- category %>% 
+  # Group by category and calculate stats
   group_by(cat) %>%
   mutate(
     group_average = median(bayes_average), 
-    n = n()
+    n = n(),
+    max = max(bayes_average)
   ) %>% 
+  # Select maximum score game
   top_n(1, bayes_average) %>% 
+  # Order by n
   arrange(desc(n)) %>% 
   ungroup() %>% 
+  # Select the first 17 categories
   top_n(17, n) %>% 
+  # Add info for later table
   mutate(ggplot = NA, img = img_name, group_average = round(group_average, 3)) %>% 
-  arrange(desc(group_average)) %>% 
+  # Arrange by maximum score
+  arrange(desc(max)) %>% 
+  # Remove these categories because the best game is the same as in 'Fantasy'
   filter(
     cat != 'Miniatures', 
     cat != 'Fighting',
     cat != 'Adventure'
   ) %>% 
-  dplyr::select(cat, n, ggplot, group_average, name, bayes_average, img) %>% 
+  # Select only columns that will be plotted
+  dplyr::select(cat, n, ggplot, name, bayes_average,
+                yearpublished, players, playingtime, img) %>% 
+  # Start table
   gt() %>%
+  # Add header
   tab_header(
-    title = md("Best game by category"),
-    subtitle = "This is the subtitle"
+    title = md("**Best game by category**"),
+    subtitle = "#TidyTuesday (2022, w4) | Data: BoardGameGeek (via Kaggle) | Graph by @irg_bio"
   ) %>%
-  tab_source_note(
-    md("More information is available at `?exibble`.")
-    )  %>% 
+  # Add plots
   text_transform(
     locations = cells_body(ggplot),
-    fn = function(x) {map(plots_dat$plots, ggplot_image, height = px(40), aspect_ratio = 3)}
+    fn = function(x) {map(plots_dat$plots, ggplot_image, height = px(40), aspect_ratio = 5)}
     ) %>% 
+  # Add images
   text_transform(
     locations = cells_body(img),
     fn = function(x) {
@@ -183,25 +195,43 @@ gt_tab <- category %>%
       )
     }
     ) %>% 
-      cols_align(
+  # Align text to center
+  cols_align(
       align = c("center"),
+      columns = c(everything())
     ) %>% 
+  # Change background color of score
   data_color(
     columns = bayes_average,
     colors = scales::col_numeric(
-      palette = 'Oranges',
+      palette = 'Blues',
       domain = c(6.998, 8.552))
   ) %>% 
-  data_color(
-    columns = group_average,
-    colors = scales::col_numeric(
-      palette = 'Blues',
-      domain = c(5.506, 5.603))
+  # Change labels of column names
+  cols_label(
+    cat = md("**Category**"),
+    n = md("**Number of games**"),
+    ggplot = md("**Distribution of scores**"),
+    name = md("**Best game**"),
+    bayes_average = md("**Score**"),
+    yearpublished = md("**Year of publication**"),
+    players = md("**Players**"),
+    playingtime = md("**Playing time**"),
+    img = md("**Image**")
+  ) %>% 
+  # Change font options
+  tab_options(heading.subtitle.font.size = 15) %>% 
+  opt_table_font(
+    font = list(
+      google_font(name = "Lato")
+    )
   )
 
-gtsave(gt_tab, 'gttab.html')
+gt_tab
 
-
+# Save table
+gtsave(gt_tab, 'final_graph.html')
+	
 
 ```
 
