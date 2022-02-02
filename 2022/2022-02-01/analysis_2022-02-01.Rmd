@@ -1,0 +1,153 @@
+---
+title: "TidyTuesday week 5"
+author: "Iker Rivas-González"
+date: "1/2/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Load the data:
+
+```{r}
+
+library(tidytuesdayR)
+library(tidyverse)
+library(colorspace)
+library(patchwork)
+library(showtext)
+font_add_google("Source Sans Pro", "sourcesanspro")
+showtext_auto()
+
+
+# Get the Data
+
+breed_traits <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-02-01/breed_traits.csv') %>% 
+  filter(!str_detect(Breed, 'Plott')) %>% 
+  mutate(across(everything(), ~ifelse(.x==0, NA, .x))) %>% 
+  mutate(
+    Breed = str_replace_all(Breed, '\\(', "ø"),
+    Breed = str_replace_all(Breed, '\\)', "æ"),
+    Breed = str_replace_all(Breed, regex("\\W+"), "å"),
+    Breed = str_replace_all(Breed, 'å', ' '),
+    Breed = str_replace_all(Breed, 'ø', "\\("),
+    Breed = str_replace_all(Breed, 'æ', "\\)"),
+    Breed = trimws(Breed)) %>% 
+  arrange(Breed)
+labels <- breed_traits$Breed
+traits <- breed_traits %>% 
+  select(-c(Breed, `Coat Type`, `Coat Length`)) %>% 
+  as.matrix()
+rownames(traits) <- labels
+
+breed_rank <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-02-01/breed_rank.csv') %>% 
+  filter(!str_detect(Breed, 'Plott')) %>% 
+  select(-c(links, Image)) %>% 
+  pivot_longer(-Breed) %>% 
+  mutate(name = as.integer(str_remove_all(name, ' Rank'))) %>% 
+  mutate(
+    Breed = str_replace_all(Breed, '\\(', "ø"),
+    Breed = str_replace_all(Breed, '\\)', "æ"),
+    Breed = str_replace_all(Breed, regex("\\W+"), "å"),
+    Breed = str_replace_all(Breed, 'å', ' '),
+    Breed = str_replace_all(Breed, 'ø', "\\("),
+    Breed = str_replace_all(Breed, 'æ', "\\)"),
+    Breed = trimws(Breed)) %>% 
+  group_by(Breed) %>% 
+  summarise(
+    median_rank = median(value, na.rm = T),
+    rank_2020 = value[name == 2020]
+    )
+
+
+```
+
+
+
+```{r}
+
+# Calculate the principal components on numeric traits
+set.seed(0)
+pca <- prcomp(traits, scale = T)
+
+
+rank_plot <- breed_rank %>% 
+  # Order the breed by the 1st PC
+  mutate(Breed = factor(Breed, names(sort(pca$x[,1])))) %>% 
+    ggplot() +
+    geom_tile(
+      aes(Breed, y = 'Rank', fill = median_rank),
+      color = 'white') + 
+  theme(
+    text = element_text(family = 'sourcesanspro'),
+    panel.border=element_blank(), 
+    panel.spacing = unit(0, "cm"),
+    plot.margin = margin(0, 0, 0, 0, "cm"),
+    axis.text.x.top = element_text(angle = 45, 
+                               hjust = 0,
+                               vjust = 0),
+    axis.title = element_blank(),
+    plot.title = element_text(size = 20, hjust = 0.5, vjust = - 4, face = 'bold'),
+    plot.subtitle = element_text(size = 14, hjust = 0.5, vjust = - 7)
+        ) +
+  scale_fill_continuous_sequential(
+    palette = "Greens", rev = F,
+    breaks = c(1, 50, 100, 150, 193)) +
+  guides(fill = guide_colorbar(title = 'Median\nAKC rank', reverse=T)) +
+  scale_x_discrete(
+    position = "top", 
+    breaks = names(sort(pca$x[,1]))[c(FALSE,TRUE)],
+    expand = c(0, 0)) +
+  scale_y_discrete(expand = c(0, 0)) +
+  labs(
+    title = 'Which dog breed is the best for you?',
+    subtitle = str_wrap(
+      'Heat map of dog breeds and their median yearly American Kennel Club 
+      rank (2013-2020) together with scores (1-5) for 14 traits. 
+      Half of the x axis labels for the dog breeds are plotted on top and half
+      below, for readability. 
+      Dog breeds are ordered left to right
+      by their first principal component (PC) calculated from
+      the traits, which explains 25.1% of the variance. Traits are ordered
+      top to bottom by
+      their contributions to the first PC. ', 
+      width = 180)
+  )
+
+trait_plot <- breed_traits %>% 
+  select(-c(`Coat Type`, `Coat Length`)) %>% 
+  pivot_longer(-Breed) %>% 
+  # Order breed by 1st PC and traits by their contribution to the 1st PC
+  mutate(
+    Breed = factor(Breed, names(sort(pca$x[,1]))),
+    name = factor(name, names(sort(pca$rotation[,1]))),
+    value = factor(value, as.character(5:1))) %>% 
+  ggplot() +
+  geom_tile(aes(Breed, name, fill = value), color = 'white') +
+  theme(
+    text = element_text(family = 'sourcesanspro'),
+    axis.text.x = element_text(angle = 45, 
+                               hjust = 1,
+                               vjust = 1),
+    axis.title = element_blank(),
+    plot.caption = element_text(size = 12, hjust = 0.5, vjust = 10, face = 'bold')
+  ) +
+  scale_fill_discrete_sequential(palette = "RedOr", rev = F) +
+  guides(fill = guide_legend(title = 'Trait\nscore')) +
+  scale_x_discrete(
+    breaks = names(sort(pca$x[,1]))[c(TRUE,FALSE)],
+    expand = c(0, 0)) +
+  scale_y_discrete(expand = c(0, 0)) +
+  labs(caption = '#TidyTuesday (2022, w5) | Data: American Kennel Club | Graph by @irg_bio')
+
+
+
+rank_plot /trait_plot + 
+  plot_layout(heights = c(1, 14), guides = 'collect') & 
+  theme(legend.background = element_blank())
+
+
+
+```
+
+
