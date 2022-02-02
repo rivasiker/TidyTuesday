@@ -144,7 +144,9 @@ trait_plot <- breed_traits %>%
 
 rank_plot /trait_plot + 
   plot_layout(heights = c(1, 14), guides = 'collect') & 
-  theme(legend.background = element_blank())
+  theme(
+    legend.background = element_blank(),
+    legend.margin = margin(r=40, l=10))
 
 
 
