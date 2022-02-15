@@ -9,6 +9,10 @@ project.
 Submissions
 ================
 
+## 2022-02-15
+
+![Du bois challenge](2022/2022-02-15/final_graphs/woven/woven.png)
+
 ## 2022-02-01
 
 ![Dog breeds and their traits](2022/2022-02-01/final_graph.png)
