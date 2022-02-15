@@ -1,0 +1,91 @@
+---
+title: "TidyTuesday week 7"
+author: "Iker Rivas-González"
+date: "15/02/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Load the data:
+
+```{r}
+
+library(aRtsy)
+library(tidyverse)
+
+```
+
+```{r}
+
+set.seed(86976)
+canvas_ribbons(
+  colors = c(
+    '#910319',
+    '#00378e',
+    '#4b2c16',
+    '#eaa300',
+    '#c38430',
+    '#b20020',
+    '#0e134c'
+  ),
+  background = '#dacfc3',
+  triangle = T
+) +
+  theme(
+    plot.margin = unit(c(0.7,0,-0.2,0), "in")
+  )
+
+ggsave('final_graphs/triangle/triangle.png', width = 600, height = 1000, units = 'px')
+
+
+```
+
+```{r}
+
+set.seed(10978)
+canvas_squares(
+  colors = c('#000000',
+             '#482915',
+             '#d9ccbf',
+             '#ecb116',
+             '#e1294c',
+             '#036345',
+             '#184a96'),
+  background = '#d9ccbf',
+  ratio = 1,
+  cuts = 20
+) +
+  theme(
+    plot.background = element_rect(fill = '#d9ccbf'),
+    plot.margin = unit(c(0.8,0,0,0.5), "in")
+  )
+  
+ggsave('final_graphs/squares/squares.png', width = 800, height = 1000, units = 'px')
+
+```
+
+```{r}
+
+set.seed(19898)
+canvas_segments(
+  colors = c(
+    '#e2a82d',
+    '#7c87a5'
+  ),
+  background = '#ddcbbb',
+  size = 1.5,
+  H = 0.3,
+  n = 100
+)
+
+ggsave('final_graphs/woven/woven.png', width = 800, height = 1000, units = 'px')
+
+```
+
+
+
+
+
+
+
