@@ -11,7 +11,18 @@ Submissions
 
 ## 2022-02-15
 
-![Du bois challenge](2022/2022-02-15/final_graphs/woven/woven.png)
+Du bois plate 23             |  Woven lines Du Bois style
+:-------------------------:|:-------------------------:
+![Du bois challenge](2022/2022-02-15/final_graphs/woven/image-006.jpg) | ![Du bois challenge](2022/2022-02-15/final_graphs/woven/woven.png)
+
+Du bois plate 57            |  Squares Du Bois style
+:-------------------------:|:-------------------------:
+![Du bois challenge](2022/2022-02-15/final_graphs/squares/image-022.jpg) | ![Du bois challenge](2022/2022-02-15/final_graphs/squares/squares.png)
+
+Du bois plate 61            |  Triangle Du Bois style
+:-------------------------:|:-------------------------:
+![Du bois challenge](2022/2022-02-15/final_graphs/triangle/image-024.jpg) | ![Du bois challenge](2022/2022-02-15/final_graphs/triangle/triangle.png)
+
 
 ## 2022-02-01
 
