@@ -217,11 +217,11 @@ plt_fun(c('A', 'E', 'I', 'O', 'U')) +
 ```{r}
 
 babynames %>% 
-  filter(year == '1960', sex == 'M', str_detect(tolower(name), 'f')) %>% 
+  filter(year == '1950', sex == 'F', str_detect(tolower(name), 'k')) %>% 
   mutate(sum = sum(prop))
 
 babynames %>% 
-  filter(year == '1960', sex == 'M') 
+  filter(year == '1950', sex == 'F') 
 
 ```
 
