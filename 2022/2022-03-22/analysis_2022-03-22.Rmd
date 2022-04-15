@@ -1,0 +1,274 @@
+---
+title: "Tidytuesday week 12"
+author: "Iker Rivas-González"
+date: "4/14/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+
+library(tidyverse)
+library(ggthemes)
+library(ggrepel)
+library(showtext)
+font_add_google("Lato", "lato")
+showtext_auto()
+babynames <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-03-22/babynames.csv')
+
+```
+
+```{r cache=TRUE}
+
+babynames_letter <- babynames %>% 
+  mutate(name = tolower(name)) %>% 
+  group_by(year, sex, name, n) %>% 
+  summarise(letter = unlist(str_split(name, '')))
+
+
+```
+
+
+```{r}
+
+babynames_letter %>% 
+  group_by(sex, letter) %>% 
+  summarise(
+    n = sum(n)
+  ) %>% 
+  group_by(sex) %>% 
+  mutate(
+    prop = n/sum(n)
+  ) %>% 
+  ggplot() +
+  geom_col(aes(letter, prop, fill = sex), position = 'dodge')
+
+```
+
+
+```{r}
+
+plot_dat <- babynames_letter %>% 
+  mutate(sex = ifelse(sex == 'F', 'Female', 'Male')) %>% 
+  group_by(year, sex, letter) %>% 
+  summarise(
+    n = sum(n)
+  ) %>% 
+  group_by(year, sex) %>% 
+  mutate(
+    prop = n/sum(n)
+  ) %>% 
+  filter((letter %in% c('a', 'e', 'i', 'o', 'u')))
+
+lab_let <- plot_dat %>% 
+  group_by(sex, letter) %>% 
+  filter(year == max(year) | year == min(year)) %>% 
+  mutate(year = ifelse(year == max(year), year+2, year-2))
+
+plot_dat %>% 
+  ggplot()  +
+  geom_line(aes(year, prop, color = sex, group = interaction(sex, letter))) +
+  geom_text(aes(year, prop, color = sex, group = letter, label = letter),
+            data = lab_let) +
+  scale_y_sqrt() +
+  theme_few() 
+
+```
+
+
+```{r}
+
+set.seed(1990)
+
+plot_dat <- babynames_letter %>% 
+  mutate(sex = ifelse(sex == 'F', 'Female', 'Male')) %>% 
+  group_by(year, sex, letter) %>% 
+  summarise(
+    n = sum(n)
+  ) %>% 
+  group_by(year, sex) %>% 
+  mutate(
+    prop = n/sum(n)
+  ) %>% 
+  # filter(!(letter %in% c('a', 'e', 'i', 'o', 'u'))) %>% 
+  mutate(letter = letter %>% toupper()) %>% 
+  ungroup() %>% 
+  mutate(letter = factor(letter, sample(LETTERS)))
+
+```
+
+
+```{r  fig.width=12, fig.height=5}
+
+
+
+lab_let <- plot_dat %>% 
+  group_by(sex, letter) %>% 
+  filter(year == max(year) | year == min(year)) %>% 
+  mutate(year = ifelse(year == max(year), year, year))
+
+plot_dat %>% 
+  ggplot()  +
+  geom_line(aes(year, prop, color = letter,
+                group = interaction(sex, letter))) +
+  geom_text_repel(aes(year, prop, color = letter, label = letter),
+            data = filter(lab_let, year == max(year)), 
+            direction = "y", hjust = "left", nudge_x = 30,
+            max.overlaps = Inf, min.segment.length = 0,
+            segment.color = 'black', seed = 0, size = 4) +
+  geom_text_repel(aes(year, prop, color = letter, label = letter),
+            data = filter(lab_let, year == min(year)), 
+            direction = "y", hjust = "left", nudge_x = -30,
+            max.overlaps = Inf, min.segment.length = 0,
+            segment.color = 'black', seed = 1, size = 4) +
+  scale_y_sqrt(
+    breaks = c(0.001, 0.007, seq(0.02, 0.2, 0.02)),
+    sec.axis = dup_axis()
+  ) +
+  scale_x_continuous(
+    expand = expansion(mult = 0.3),
+    breaks = seq(1880, 2020, 20)
+  ) +
+  theme_few() +
+  facet_wrap(~sex) +
+  theme(
+    legend.position = 'none'  
+  )+
+  ylab('Proportion') +
+  xlab('Year') +
+  labs(
+    title = 'The popularity of the letters used in newborn baby names has changed over the years',
+    caption = '#TidyTuesday (2022, w12) | Data: babynames R package | Graph by @irg_bio'
+  )+
+    theme(
+      text = element_text(family = 'lato'),
+      axis.text = element_text(size = 12),
+      plot.title = element_text(hjust = 0.5)
+    ) 
+
+ggsave('final_graph.pdf', height = 5, width = 12)
+
+```
+
+```{r}
+
+plt_fun <- function(highlight) {
+  
+  plot_dat %>% 
+    ggplot()  +
+    geom_line(aes(year, prop, color = letter, 
+                  size = letter %in% highlight,
+                  alpha = letter %in% highlight,
+                  group = interaction(sex, letter))) +
+    geom_text_repel(aes(year, prop, color = letter, label = letter,
+                        alpha = letter %in% highlight),
+              data = filter(lab_let, year == max(year)), 
+              direction = "y", hjust = "left", nudge_x = 30,
+              max.overlaps = Inf, min.segment.length = 0,
+              segment.color = 'black', seed = 0, size = 4
+              ) +
+    geom_text_repel(aes(year, prop, color = letter, label = letter,
+                        alpha = letter %in% highlight),
+              data = filter(lab_let, year == min(year)), 
+              direction = "y", hjust = "left", nudge_x = -30,
+              max.overlaps = Inf, min.segment.length = 0,
+              segment.color = 'black', seed = 1, size = 4) +
+    scale_y_sqrt(
+      breaks = c(0, 0.001, 0.007, seq(0.02, 0.2, 0.02)),
+      sec.axis = dup_axis()
+    ) +
+    scale_x_continuous(
+      expand = expansion(mult = 0.3),
+      breaks = seq(1880, 2020, 20)
+    ) +
+    theme_few() +
+    facet_wrap(~sex) +
+    theme(
+      legend.position = 'none'  
+    ) +
+    scale_size_discrete(range = c(0.5, 1)) +
+    scale_alpha_discrete(range = c(0.3, 1)) +
+    ylab('Proportion') +
+    xlab('Year') 
+}
+
+
+
+```
+
+
+
+```{r fig.width=12, fig.height=5}
+
+plt_fun(c('A', 'E', 'I', 'O', 'U')) +
+  labs(
+    title = 'The vowels',
+    caption = '#TidyTuesday (2022, w12) | Data: babynames R package | Graph by @irg_bio'
+  ) +
+    theme(
+      text = element_text(family = 'lato'),
+      axis.text = element_text(size = 12),
+      plot.title = element_text(hjust = 0.5)
+    ) 
+
+```
+
+```{r}
+
+babynames %>% 
+  filter(year == '1960', sex == 'M', str_detect(tolower(name), 'f')) %>% 
+  mutate(sum = sum(prop))
+
+babynames %>% 
+  filter(year == '1960', sex == 'M') 
+
+```
+
+
+```{r fig.width=12, fig.height=5}
+
+plt_fun(c('F', 'S', 'O')) +
+  labs(
+    title = 'The rise and fall of letters',
+    caption = '#TidyTuesday (2022, w12) | Data: babynames R package | Graph by @irg_bio'
+  ) +
+    theme(
+      text = element_text(family = 'lato'),
+      axis.text = element_text(size = 12),
+      plot.title = element_text(hjust = 0.5)
+    ) 
+
+```
+
+```{r fig.width=12, fig.height=5}
+
+plt_fun(c('R', 'W')) +
+  labs(
+    title = 'Decreasing trends',
+    caption = '#TidyTuesday (2022, w12) | Data: babynames R package | Graph by @irg_bio'
+  ) +
+    theme(
+      text = element_text(family = 'lato'),
+      axis.text = element_text(size = 12),
+      plot.title = element_text(hjust = 0.5)
+    ) 
+
+```
+
+```{r fig.width=12, fig.height=5}
+
+plt_fun(c('K', 'X', 'N')) +
+  labs(
+    title = 'The newbies',
+    caption = '#TidyTuesday (2022, w12) | Data: babynames R package | Graph by @irg_bio'
+  ) +
+    theme(
+      text = element_text(family = 'lato'),
+      axis.text = element_text(size = 12),
+      plot.title = element_text(hjust = 0.5)
+    ) 
+
+```
+
+

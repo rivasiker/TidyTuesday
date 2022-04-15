@@ -1,0 +1,151 @@
+---
+title: "TidyTuesday week 5"
+author: "Iker Rivas-González"
+date: "1/2/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Load the data:
+
+```{r}
+
+library(tidytuesdayR)
+library(tidyverse)
+library(ggHoriPlot)
+library(ggh4x)
+library(ggthemes)
+library(grid)
+library(patchwork)
+
+tuesdata <- tidytuesdayR::tt_load('2022-02-22')
+
+freedom <- tuesdata$freedom
+
+
+```
+
+```{r}
+
+get_plt <- function(continent) {
+  freedom %>% 
+  filter(Region_Name == continent) %>% 
+  group_by(country) %>% 
+  mutate(corre = median(CL),
+         country = fct_reorder(country, corre),
+         year = as.Date(ISOdate(year, 1, 1))) %>% 
+  ggplot() +
+  # geom_col(aes(year, y = CL, fill = CL)) +
+  geom_tile(aes(year, y = 1, fill = CL)) +
+  facet_wrap(fct_reorder(country, corre)~., ncol = 1, strip.position = 'right') +
+  theme_few() +
+  scale_x_date(expand=c(0,0), date_breaks = "5 years", date_labels = "%Y") +
+  theme(
+    panel.spacing.y=unit(0, "lines"),
+    #panel.border = element_rect(color = "black", fill = NA, size = 0.5),
+    panel.border = element_blank(),
+    strip.text.y = element_text(angle=0, size = 4, hjust = 0),
+    strip.text = element_text(size = 4),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.title = element_blank(),
+    axis.text.x = element_text(size = 4),
+    panel.grid = element_blank()
+    ) +
+    scale_fill_continuous(limits=c(1, 7))
+}
+
+Asia <- get_plt('Asia')
+Europe <- get_plt('Europe')
+Africa <- get_plt('Africa')
+Americas <- get_plt('Americas')
+Oceania <- get_plt('Oceania')
+
+layout <- c(
+  area(l = 1, r = 2, 
+       t = 1, 
+       b = length(unique(Asia$data$country))),
+  area(l = 1, r = 2, 
+       t = length(unique(Asia$data$country))+1, 
+       b = length(unique(Asia$data$country))+1+length(unique(Africa$data$country))),
+  area(l = 3, r = 4, 
+       t = 1, 
+       b = length(unique(Europe$data$country))),
+  area(l = 3, r = 4, 
+       t = length(unique(Europe$data$country))+1, 
+       b = length(unique(Europe$data$country))+length(unique(Americas$data$country))+1),
+  area(l = 3, r = 4, 
+       t = length(unique(Europe$data$country))+length(unique(Americas$data$country))+2, 
+       b = length(unique(Europe$data$country))+length(unique(Americas$data$country))+length(unique(Oceania$data$country))+2)
+)
+
+
+(Asia  + Africa + Europe + Americas + Oceania) + 
+  plot_layout(
+    design = layout, guides = 'collect') &
+  theme(axis.title = element_blank())
+
+```
+
+```{r}
+
+get_plt <- function(continent) {
+  freedom %>% 
+  filter(Region_Name == continent) %>% 
+  group_by(country) %>% 
+  mutate(corre = median(PR),
+         country = fct_reorder(country, corre),
+         year = as.Date(ISOdate(year, 1, 1))) %>% 
+  ggplot() +
+  # geom_col(aes(year, y = CL, fill = CL)) +
+  geom_tile(aes(year, y = 1, fill = PR)) +
+  facet_wrap(fct_reorder(country, corre)~., ncol = 1, strip.position = 'right') +
+  theme_few() +
+  scale_x_date(expand=c(0,0), date_breaks = "5 years", date_labels = "%Y") +
+  theme(
+    panel.spacing.y=unit(0, "lines"),
+    #panel.border = element_rect(color = "black", fill = NA, size = 0.5),
+    panel.border = element_blank(),
+    strip.text.y = element_text(angle=0, size = 4, hjust = 0),
+    strip.text = element_text(size = 4),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.title = element_blank(),
+    axis.text.x = element_text(size = 4),
+    panel.grid = element_blank()
+    ) +
+    scale_fill_continuous(limits=c(1, 7))
+}
+
+Asia <- get_plt('Asia')
+Europe <- get_plt('Europe')
+Africa <- get_plt('Africa')
+Americas <- get_plt('Americas')
+Oceania <- get_plt('Oceania')
+
+layout <- c(
+  area(l = 1, r = 2, 
+       t = 1, 
+       b = length(unique(Asia$data$country))),
+  area(l = 1, r = 2, 
+       t = length(unique(Asia$data$country))+1, 
+       b = length(unique(Asia$data$country))+1+length(unique(Africa$data$country))),
+  area(l = 3, r = 4, 
+       t = 1, 
+       b = length(unique(Europe$data$country))),
+  area(l = 3, r = 4, 
+       t = length(unique(Europe$data$country))+1, 
+       b = length(unique(Europe$data$country))+length(unique(Americas$data$country))+1),
+  area(l = 3, r = 4, 
+       t = length(unique(Europe$data$country))+length(unique(Americas$data$country))+2, 
+       b = length(unique(Europe$data$country))+length(unique(Americas$data$country))+length(unique(Oceania$data$country))+2)
+)
+
+
+(Asia  + Africa + Europe + Americas + Oceania) + 
+  plot_layout(
+    design = layout, guides = 'collect') &
+  theme(axis.title = element_blank())
+
+```
