@@ -212,6 +212,8 @@ plt_fun(c('A', 'E', 'I', 'O', 'U')) +
       plot.title = element_text(hjust = 0.5)
     ) 
 
+ggsave('vowels.pdf', height = 5, width = 12)
+
 ```
 
 ```{r}
@@ -239,6 +241,9 @@ plt_fun(c('F', 'S', 'O')) +
       plot.title = element_text(hjust = 0.5)
     ) 
 
+ggsave('peaks.pdf', height = 5, width = 12)
+
+
 ```
 
 ```{r fig.width=12, fig.height=5}
@@ -254,6 +259,9 @@ plt_fun(c('R', 'W')) +
       plot.title = element_text(hjust = 0.5)
     ) 
 
+ggsave('decreasing.pdf', height = 5, width = 12)
+
+
 ```
 
 ```{r fig.width=12, fig.height=5}
@@ -268,6 +276,9 @@ plt_fun(c('K', 'X', 'N')) +
       axis.text = element_text(size = 12),
       plot.title = element_text(hjust = 0.5)
     ) 
+
+ggsave('increasing.pdf', height = 5, width = 12)
+
 
 ```
 
