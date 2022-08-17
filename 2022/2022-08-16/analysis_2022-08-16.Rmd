@@ -1,0 +1,227 @@
+---
+title: "Tidytuesday week 33"
+author: "Iker Rivas-González"
+date: "4/14/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r}
+
+library(tidyverse)
+library(ggthemes)
+library(umap)
+# devtools::install_github("hadley/emo")
+library(emo)
+library(patchwork)
+library(shiny)
+
+# Load data
+tuesdata <- tidytuesdayR::tt_load('2022-08-16')
+psych_stats <- tuesdata$psych_stats
+characters <- tuesdata$characters %>% 
+  rename(char_id = id)
+
+```
+
+```{r}
+
+a <- psych_stats %>% 
+  # Remove extra /
+  mutate(
+    question = ifelse(question == 'boy/girl-next-door/celebrity', 'boy girl-next-door/celebrity', question),
+    personality = ifelse(personality == 'boy/girl-next-door', 'boy girl-next-door', personality)
+  ) %>% 
+  # Separate question into answers
+  separate(question, c('main', 'second'), "/", remove = F) %>% 
+  # If the answer for the character is the same as the second answer,
+  # invert the trait score
+  mutate(
+    avg_rating = ifelse(personality == main, avg_rating, 100-avg_rating)
+  ) %>% 
+  # Select only useful columns
+  select(char_id, main, avg_rating) %>% 
+  # Remove redundant answers
+  group_by(char_id, main) %>% 
+  mutate(n = n()) %>% 
+  ungroup() %>% 
+  filter(n == 1) %>% 
+  select(-n) %>% 
+  # Make data tidy
+  pivot_wider(names_from = main, values_from = avg_rating)
+
+# Calculate UMAO
+pers_lab <- a$char_id
+set.seed(10)
+pers_umap <- a %>% 
+  select(-char_id) %>% 
+  as.matrix()
+
+# Calculate PCA
+pca <- prcomp(pers_umap, scale. = T)
+pca_res <- pca$x %>% 
+  as_tibble()
+umap_res <- umap(pers_umap)$layout %>% 
+  as_tibble()
+
+# Unify results
+res_tab <- bind_cols(pca_res, umap_res) %>% 
+  mutate(char_id = pers_lab) %>% 
+  select(char_id, everything()) %>% 
+  full_join(characters, 'char_id') %>% 
+  full_join(a, 'char_id')
+
+
+```
+
+
+```{r}
+
+
+res_tab2 <- res_tab %>% 
+  # Create label with name and universe
+  unite('Label', name, uni_name, sep = '\n(') %>% 
+  mutate(Label = paste0(Label, ')')) %>% 
+  # Select desired columns
+  select(V1, V2, Label, notability, everything()) %>% 
+  select(-starts_with('PC'), -char_id, -link, -image_link)
+
+# Create main UMAP scatter plot
+p <- res_tab2 %>% 
+  ggplot() +
+  geom_point(aes(V1, V2, color = notability, group = Label)) +
+  # geom_text(aes(V1, V2, label = Label), size = 3, position = position_jitter(width=0.01,height=0.01)) +
+  scale_color_viridis_c() +
+  theme_few() +
+  xlab('UMAP1') +
+  ylab('UMAP2') +
+  theme(legend.position = 'bottom', plot.title = element_text(hjust = 0.5),
+        legend.title = element_text(vjust = 0.75)) +
+  scale_x_continuous(expand = c(0.01, 0.01)) +
+  scale_y_continuous(expand = c(0.01, 0.01)) +
+  guides(color = guide_colorbar('Notability score'))
+
+
+p
+# ggplotly(p, tooltip = 'group')
+
+```
+
+
+
+
+
+```{r}
+
+
+# Define UI
+ui <- fluidPage(
+  # Title
+  h3("Which personality traits do characters from different universes share?"),
+  # Subtitle
+  h5('The left panel is an interactive scatter plot of the UMAP of the 
+     personality trait scores of fictional characters from different universes. Each dot represents
+     a certain character, colored by their notability score. The main idea is that characters with 
+     similar personalities are grouped together. In order to have a better understanding
+     of what specific traits bind these characters, you can draw a square to select 
+     neighboring characters. A heatmap will then appear on the right side, showing the 
+     most extreme personality trait scores for that group of characters.'),
+  h6('#TidyTuesday (2022, w33) | Data: Open-Source Psychometrics Project | Graph by @irg_bio'),
+  # Plot area in two columns
+  fluidRow(column(6, plotOutput(outputId = "graph", brush = "plot_brush", height = "700px")),
+           column(6, plotOutput(outputId = "plot_brush", height = "700px")))
+)
+
+# Define server
+server <- function(input, output, session) {
+  
+  # Add scatter plot
+  output$graph <- renderPlot({
+    p + ggtitle('UMAP of the character personality')
+  })
+  
+  # Add heatmap after brushing
+ output$plot_brush <-  renderPlot({
+   # If no points are selected
+   n = nrow(brushedPoints(res_tab2, brush = input$plot_brush)) 
+   # Return nothing
+   if(n==0) { 
+     return()
+   } else {
+     # Filter dataframe with brushed data points
+     br <- brushedPoints(res_tab2, brush = input$plot_brush) # return rows
+     br2 <- br %>%
+       select(-uni_id,-V1,-V2,-notability) %>%
+       pivot_longer(-Label) %>%
+       filter(!ji_detect(name)) %>%
+       mutate(name = str_sub(name, 1, 30)) %>%
+       group_by(name) %>%
+       mutate(mea = mean(value)) %>%
+       group_by(Label) %>%
+       mutate(name = reorder(name, mea)) 
+     # Top graph
+     a1 <- br2 %>% 
+       top_n(40, mea) %>% 
+       ggplot() +
+       geom_tile(aes(Label, name, fill = value)) +
+       theme_few() +
+       scale_fill_viridis_c(option = "plasma", limits = c(0, 100)) +
+       theme(
+         axis.title.y  = element_blank(),
+         axis.title.x  = element_blank(),
+         legend.position = 'bottom'
+       ) +
+       scale_y_discrete(
+          # breaks = seq(1, length(levels(br2$name)), 2),
+          # labels = levels(br2$name)[c(TRUE, FALSE)],
+          expand = c(0, 0),
+          position = 'right',
+          # sec.axis = dup_axis(breaks = seq(2, length(levels(br2$name)), 2), 
+          # labels = levels(br2$name)[c(FALSE, TRUE)])
+          ) +
+       scale_x_discrete(expand = c(0,0), position = 'top') +
+       guides(fill = guide_colorbar('Personality trait score'))
+     # Bottom graph
+     a2 <- br2 %>% 
+       top_n(40, desc(mea)) %>% 
+       ggplot() +
+       geom_tile(aes(Label, name, fill = value)) +
+       theme_few() +
+       scale_fill_viridis_c(option = "plasma", limits = c(0, 100)) +
+       theme(
+         axis.title.y  = element_blank(),
+         axis.title.x  = element_blank(),
+         legend.position = 'bottom'
+       ) +
+       scale_y_discrete(
+          # breaks = seq(1, length(levels(br2$name)), 2),
+          # labels = levels(br2$name),
+          expand = c(0, 0),
+          position = 'right',
+       # sec.axis = dup_axis(breaks = seq(2, length(levels(br2$name)), 2),
+       # labels = levels(br2$name)[c(FALSE, TRUE)])
+       ) +
+       scale_x_discrete(expand = c(0,0), position = 'bottom') +
+       guides(fill = guide_colorbar('Personality trait score'))
+     
+     # Both graphs
+     a1/a2 + 
+       plot_annotation('Heatmap of the most extreme average personality trait scores per selected character',
+                       theme = theme(plot.title = element_text(hjust = 0.3))) +
+       plot_layout(guides = 'collect') & 
+       theme(legend.position = 'bottom', legend.title = element_text(vjust = 0.75)) 
+     
+
+   }
+  })
+   
+}
+
+shinyApp(ui, server)
+
+```
+
+
+
+
