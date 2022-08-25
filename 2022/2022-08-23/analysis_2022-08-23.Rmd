@@ -1,0 +1,128 @@
+---
+title: "Tidytuesday week 34"
+author: "Iker Rivas-González"
+date: "4/14/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r fig.width=5, fig.height=4}
+
+library(tidyverse)
+library(ggthemes)
+library(ggtext) 
+library(showtext)
+showtext_auto(enable = TRUE)
+
+font_add_google("Source Sans Pro")
+f1 = "Source Sans Pro"
+
+# Load data
+chips <- read_csv('chip_dataset.csv')
+
+chips_2 <- chips %>% 
+  filter(
+    `Release Date` != "NaT",
+    !is.na(`Transistors (million)`),
+    !is.na(`Process Size (nm)`)
+  ) %>% 
+  mutate(
+    `Release Date` = parse_date(`Release Date`, '%Y-%m-%d'),
+    num_date = `Release Date`,
+    log_trans = `Transistors (million)`
+  ) 
+
+lm_chips_CPU <- lm(log(log_trans)~num_date, chips_2[chips_2$Type=='CPU',])
+lm_chips_GPU <- lm(log(log_trans)~num_date, chips_2[chips_2$Type=='GPU',])
+new_chip_date <- tibble(
+  num_date=
+    parse_date(
+      c('2025-01-01', '2030-01-01', '2035-01-01'), 
+      '%Y-%m-%d'))
+pred_chips_CPU <- predict(lm_chips_CPU, newdata = new_chip_date)
+pred_chips_GPU <- predict(lm_chips_GPU, newdata = new_chip_date)
+pred_out_CPU <- new_chip_date %>% 
+  transmute(
+    `Release Date` = num_date,
+    Type = 'CPU', 
+    `Transistors (million)` = exp(pred_chips_CPU)
+  )
+pred_out_GPU <- new_chip_date %>% 
+  transmute(
+    `Release Date` = num_date,
+    Type = 'GPU', 
+    `Transistors (million)` = exp(pred_chips_GPU)
+  )
+
+exp(lm_chips_CPU$coefficients[2]*365.25*2)
+exp(log(362410/95600)/5*2)
+exp(lm_chips_GPU$coefficients[2]*365.25*2)
+exp(log(759374/176752)/5*2)
+
+log(2)/(lm_chips_CPU$coefficients[2]*365.25)
+log(2)/(lm_chips_GPU$coefficients[2]*365.25)
+
+chips_2 %>% 
+  ggplot() +
+  geom_smooth(aes(`Release Date`, `Transistors (million)`, color = Type),
+              method = lm, fullrange=TRUE, se = F) +
+  geom_segment(aes(y = 0, yend = `Transistors (million)`,
+                   x = `Release Date`, xend = `Release Date`, color = Type),
+               data = pred_out_CPU, linetype = 2, alpha = 0.5) +
+  geom_segment(aes(y = 0, yend = `Transistors (million)`,
+                   x = `Release Date`, xend = `Release Date`, color = Type),
+               data = pred_out_GPU, linetype = 2, alpha = 0.5) +
+  geom_segment(aes(y = `Transistors (million)`, yend = `Transistors (million)`,
+                   x = min(chips_2$`Release Date`), xend = `Release Date`, color = Type),
+               data = pred_out_CPU, linetype = 2, alpha = 0.5) +
+  geom_segment(aes(y = `Transistors (million)`, yend = `Transistors (million)`,
+                   x = min(chips_2$`Release Date`), xend = `Release Date`, color = Type),
+               data = pred_out_GPU, linetype = 2, alpha = 0.5) +
+  geom_label(aes(y = `Transistors (million)`,  x = min(chips_2$`Release Date`), 
+                 label = round(`Transistors (million)`), color = 'GPU'),
+               data = pred_out_GPU, hjust = 0, show.legend  = FALSE) +
+  geom_label(aes(y = `Transistors (million)`,  x = min(chips_2$`Release Date`), 
+                 label = round(`Transistors (million)`), color = 'CPU'),
+               data = pred_out_CPU, hjust = 0, show.legend  = FALSE) +
+  geom_point(aes(`Release Date`, `Transistors (million)`, 
+                 color = Type, size = `Process Size (nm)`),
+             alpha = 0.1, shape = 21) +
+  scale_y_continuous(trans = 'log10', breaks = c(1e1, 1e2, 1e3, 1e4, 1e5, 1e6)) +
+  scale_x_date(breaks = parse_date(as.character(seq(2000, 2035, 5)), "%Y"), 
+               limits = c(chips_2$`Release Date` %>% min(), parse_date('2035-01-01', '%Y-%m-%d')),
+               date_labels = "%Y") +
+  theme_few() + 
+  guides(color = guide_legend(override.aes = list(alpha = 1, shape = 16)),
+         size = guide_legend(override.aes = list(alpha = 1))) +
+  scale_color_manual(values = c('#0da31c', '#5904c2')) +
+  labs(
+    title = "**Will Moore's Law still hold?**",
+    subtitle = str_wrap(
+      "Moore's Law states that the number of transistors in a dense
+      integrated circuit doubles about every<br>two years. The plot below confirm this 
+      trend, where the fitted models show that the number of transistor<br>doubles 
+      every 2.6 and 2.4 years for <span style='color:#0da31c;'>CPUs</span>
+      and <span style='color:#5904c2;'>GPUs</span> respectively. This is, in part, 
+      due to smaller<br>transistor sizes, which is represented as the size of dots
+      in the plot. The graph also shows a projection<br>of the expected number of
+      transistors per chip in the following years if the same trend still holds.", 
+      width = 105),
+    y = "Transistors (in millions, log scale)",
+    caption = "#TidyTuesday (2022, w34) | Data: CHIP Datase via Sun, Agostini, Dong & Kaeli (2019) | Graph by @irg_bio"
+  ) +
+  theme(
+    text=element_text(family=f1),
+    plot.title = element_markdown(family=f1),
+    plot.subtitle = element_markdown(family=f1, size=13)) +
+  NULL
+
+ggsave('final_graph.png', width = 10, height = 8)
+
+```
+
+
+
+
+
+
