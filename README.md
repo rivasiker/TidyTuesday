@@ -9,6 +9,14 @@ project.
 Submissions
 ================
 
+## 2022-08-23
+
+![Moore's Law - CHIP Dataset](2022/2022-08-23/final_graph.png)
+
+## 2022-08-16
+
+![Personalities of fictional characters](2022/2022-08-16/final_graph.gif)
+
 ## 2022-03-22
 
 ![Popularity of letters in newborn baby names](2022/2022-03-22/final_graph.png)
