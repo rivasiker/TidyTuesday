@@ -101,12 +101,12 @@ chips_2 %>%
     subtitle = str_wrap(
       "Moore's Law states that the number of transistors in a dense
       integrated circuit doubles about every<br>two years. The plot below confirm this 
-      trend, where the fitted models show that the number of transistor<br>doubles 
+      trend, where the fitted models show that the number of transistors<br>doubles 
       every 2.6 and 2.4 years for <span style='color:#0da31c;'>CPUs</span>
-      and <span style='color:#5904c2;'>GPUs</span> respectively. This is, in part, 
+      and <span style='color:#5904c2;'>GPUs</span>, respectively. This is, in part, 
       due to smaller<br>transistor sizes, which is represented as the size of dots
       in the plot. The graph also shows a projection<br>of the expected number of
-      transistors per chip in the following years if the same trend still holds.", 
+      transistors per chip in the following years, if the same trend still holds.", 
       width = 105),
     y = "Transistors (in millions, log scale)",
     caption = "#TidyTuesday (2022, w34) | Data: CHIP Datase via Sun, Agostini, Dong & Kaeli (2019) | Graph by @irg_bio"
