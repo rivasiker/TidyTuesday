@@ -1,0 +1,233 @@
+---
+title: "Tidytuesday week 34"
+author: "Iker Rivas-González"
+date: "8/30/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r fig.width=5, fig.height=4}
+
+library(tidyverse)
+library(ggthemes)
+library(showtext)
+library(readxl)
+library(ggHoriPlot)
+library('geofacet')
+library(ggrepel)
+showtext_auto(enable = TRUE)
+font_add_google("Source Sans Pro")
+f1 = "Source Sans Pro"
+
+tuesdata <- tidytuesdayR::tt_load('2022-08-30')
+pell <- tuesdata$pell
+
+pell
+
+```
+
+```{r}
+
+lookup <- setNames(c(state.abb, "DC"), c(state.name, "District of Columbia"))
+
+popdata <- read_csv('apportionment.csv') %>% 
+  select(Name, Year, `Resident Population`) %>% 
+  arrange(Name, Year) %>% 
+  group_by(Name) %>% 
+  mutate(res2 = lead(`Resident Population`)) %>% 
+  group_by(Name, Year) %>% 
+  drop_na() %>% 
+  summarise(
+    year = Year:(Year+9),
+    population = seq(`Resident Population`, res2, length.out=11)[1:10]
+  ) %>% 
+  ungroup() %>% 
+  transmute(
+    STATE = lookup[Name],
+    YEAR = year, 
+    population)
+
+```
+
+
+```{r}
+
+combined_data <- left_join(pell, popdata, by = c("STATE", "YEAR")) %>% 
+  group_by(STATE, YEAR) %>% 
+  summarise(
+    award_total = sum(AWARD), 
+    recipient_total = sum(RECIPIENT),
+    population = unique(population)
+  ) %>% 
+  mutate(
+    award_per_capita = award_total/population,
+    award_per_recipient = award_total/recipient_total,
+    recipient_fraction = recipient_total/population
+  ) %>% 
+  drop_na() 
+
+```
+
+```{r fig.height=4, fig.width=6}
+
+highlight_states <- c('AZ', 'DC', 'IA')
+
+p0_additional_data <- combined_data %>% 
+  filter(YEAR == 2010, STATE %in% highlight_states) %>% 
+  mutate(
+    label = round(award_per_capita)
+  )
+
+
+p0 <- combined_data %>% 
+  ggplot() +
+  geom_line(aes(YEAR, award_per_capita, color = STATE %in% highlight_states), 
+            size = 1) +
+  geom_text_repel(aes(YEAR, award_per_capita, label = label),
+                  seed = 0, min.segment.length = 0,
+                  nudge_x = -5, direction = "x", hjust = "right",
+             data = p0_additional_data) +
+  facet_geo(~ STATE) +
+  theme_bw() +
+  scale_color_manual(values = c('black', 'cyan3')) +
+  theme(
+    text = element_text(family = f1),
+    axis.text.x = element_text(angle = -35, hjust = 0),
+    panel.grid.minor = element_blank(),
+    strip.background = element_rect(fill = 'white'),
+    legend.position = 'none',
+    plot.title = element_text(hjust = 0.5, size = 20),
+    plot.subtitle = element_text(hjust = 0.5, size = 15, margin = margin(b = 20))
+  ) +
+  labs(
+    title = 'Total dollar value of all awarded Pell Grants divided by the population size per state',
+    subtitle = "#TidyTuesday (2022, w35) | Data: US Dept of Education via the pell R package & US Census Bureau | Graph by @irg_bio"
+  ) +
+  xlab('Year') +
+  ylab('Dollars per capita')
+
+p0
+
+```
+
+
+```{r fig.height=4, fig.width=6}
+
+
+
+highlight_states <- c('AZ', 'TX', 'FL', 'NY')
+
+p1_additional_data <- combined_data %>% 
+  filter(STATE %in% highlight_states, YEAR == 2010) %>% 
+  mutate(
+    label = paste0('$', round(award_total/1000000000, 1), 'B')
+  )
+
+p1 <- combined_data %>% 
+  ggplot() +
+  geom_line(aes(YEAR, award_total/1000000000, 
+                color = STATE %in% highlight_states), 
+            size = 1) +
+  geom_text_repel(aes(YEAR, award_total/1000000000, label = label),
+                  seed = 0, min.segment.length = 0,
+                  nudge_x = -5, direction = "x", hjust = "right",
+             data = p1_additional_data) +
+  facet_geo(~ STATE) +
+  theme_bw() +
+  scale_color_manual(values = c('black', 'orange')) +
+  theme(
+    text = element_text(family = f1),
+    axis.text.x = element_text(angle = -35, hjust = 0),
+    panel.grid.minor = element_blank(),
+    strip.background = element_rect(fill = 'white'),
+    legend.position = 'none',
+    plot.title = element_text(hjust = 0.5, size = 20),
+    plot.subtitle = element_text(hjust = 0.5, size = 15, margin = margin(b = 20))
+  ) +
+  labs(
+    title = 'Total dollar value of all awarded Pell Grants per state',
+    subtitle = "#TidyTuesday (2022, w35) | Data: US Dept of Education via the pell R package & US Census Bureau | Graph by @irg_bio"
+  ) +
+  xlab('Year') +
+  ylab('Billions of dollars')
+
+p1
+
+```
+
+
+```{r fig.height=4, fig.width=6}
+
+
+p2 <- combined_data %>% 
+  ggplot() +
+  geom_line(aes(YEAR, award_total/recipient_total), 
+            size = 1) +
+  facet_geo(~ STATE) +
+  theme_bw() +
+  scale_color_manual(values = c('black', 'orange')) +
+  theme(
+    text = element_text(family = f1),
+    axis.text.x = element_text(angle = -35, hjust = 0),
+    panel.grid.minor = element_blank(),
+    strip.background = element_rect(fill = 'white'),
+    legend.position = 'none',
+    plot.title = element_text(hjust = 0.5, size = 20),
+    plot.subtitle = element_text(hjust = 0.5, size = 15, margin = margin(b = 20))
+  ) +
+  labs(
+    title = 'Average dollar value of awarded Pell Grants per state',
+    subtitle = "#TidyTuesday (2022, w35) | Data: US Dept of Education via the pell R package & US Census Bureau | Graph by @irg_bio"
+  ) +
+  xlab('Year') +
+  ylab('Dollars per recipient')
+
+p2
+
+```
+
+```{r fig.height=4, fig.width=6}
+
+highlight_states <- c('AZ', 'DC', 'IA')
+
+p4_additional_data <- combined_data %>% 
+  filter(YEAR == 2010, STATE %in% highlight_states) %>% 
+  mutate(
+    label = round(recipient_fraction, 3)
+  )
+
+
+p4 <- combined_data %>% 
+  ggplot() +
+  geom_line(aes(YEAR, recipient_fraction, color = STATE %in% highlight_states), 
+            size = 1) +
+  geom_text_repel(aes(YEAR, recipient_fraction, label = label),
+                  seed = 0, min.segment.length = 0,
+                  nudge_x = -5, direction = "x", hjust = "right",
+             data = p4_additional_data) +
+  facet_geo(~ STATE) +
+  theme_bw() +
+  scale_color_manual(values = c('black', 'deeppink1')) +
+  theme(
+    text = element_text(family = f1),
+    axis.text.x = element_text(angle = -35, hjust = 0),
+    panel.grid.minor = element_blank(),
+    strip.background = element_rect(fill = 'white'),
+    legend.position = 'none',
+    plot.title = element_text(hjust = 0.5, size = 20, margin = margin(b = 10)),
+    plot.subtitle = element_text(hjust = 0.5, size = 15, margin = margin(b = 20))
+  ) +
+  labs(
+    title = 'Number of awarded Pell Grants divided by the population size per state',
+    subtitle = "#TidyTuesday (2022, w35) | Data: US Dept of Education via the pell R package & US Census Bureau | Graph by @irg_bio"
+  ) +
+  xlab('Year') +
+  ylab('Fraction of the population')
+
+p4
+
+```
+
+
+
