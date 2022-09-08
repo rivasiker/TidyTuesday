@@ -9,6 +9,10 @@ project.
 Submissions
 ================
 
+## 2022-09-06
+
+![Lego colors](https://github.com/rivasiker/TidyTuesday/blob/main/2022/2022-09-06/final_graph.png)
+
 ## 2022-08-23
 
 ![Pell Grants](2022/2022-08-30/p0.png)
