@@ -9,6 +9,10 @@ project.
 Submissions
 ================
 
+## 2023-01-03
+
+![2023 recap](https://github.com/rivasiker/TidyTuesday/blob/main/2023/2023-01-03/final_graph.png)
+
 ## 2022-09-06
 
 ![Lego colors](https://github.com/rivasiker/TidyTuesday/blob/main/2022/2022-09-06/final_graph.png)
