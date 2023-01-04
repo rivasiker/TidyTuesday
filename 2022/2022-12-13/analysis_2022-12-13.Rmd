@@ -1,0 +1,89 @@
+---
+title: "Tidytuesday week 36"
+author: "Iker Rivas-González"
+date: "9/6/2022"
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+```{r fig.width=5, fig.height=4}
+
+library(tidyverse)
+library(ggHoriPlot)
+library(stringi)
+library(ggthemes)
+library(ggh4x)
+
+tuesdata <- tidytuesdayR::tt_load('2022-12-13')
+tuesdata <- tidytuesdayR::tt_load(2022, week = 50)
+
+state_retail <- tuesdata$state_retail
+coverage_codes <- tuesdata$coverage_codes
+
+
+```
+
+```{r}
+
+dat_plt |> 
+  arrange(subsector, date)
+
+```
+
+
+```{r fig.height=3, fig.width=5}
+
+dat_plt <- state_retail |> 
+  filter(state_abbr == 'USA') |> 
+  mutate(
+    month2 = stri_pad_left(month, 2, 0),
+    change_yoy = as.numeric(change_yoy)
+  ) |> 
+  unite('date', c(year, month2), sep = '-', remove = F) |> 
+  group_by(state_abbr, subsector, year) |> 
+  mutate(
+    date = as.Date(paste(date, "-01", sep=""), "%Y-%m-%d"),
+    date2 = lag(date)
+  ) 
+
+sca <- seq(-40, 40, length.out=7)[-4]
+ori <- seq(-40, 40, length.out=7)[4]
+
+dat_plt |> 
+  ggplot() +
+  geom_horizon(aes(x = month, xend = month+1, y = change_yoy, fill = ..Cutpoints..),
+               origin = ori, horizonscale = sca, key_glyph = draw_key_rect) +
+  scale_fill_manual(
+    values = hcl.colors(6, 'Roma'),
+    labels = c('', 26, 13, 0, -13, -26),
+    guide = guide_legend(
+      title = 'Year-over-year percent\nchange in retail sales value',
+      keyheight = unit(5, units = "mm"),
+      keywidth = unit(15, units = "mm"),
+      direction = "horizontal",
+      title.position = 'top',
+      title.hjust = 0.5,
+      label.hjust = 1.1,
+      nrow = 1,
+      byrow = T,
+      reverse = T,
+      label.position = "bottom"
+      )
+    ) +
+  facet_grid(subsector~year, space = "free_x", scales = 'free_x')+
+  theme_few() +
+  theme(
+    legend.position = 'bottom',
+    panel.spacing=unit(0, "lines"),
+    strip.text.y = element_text(size = 7, angle = 0, hjust = 0),
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank(),
+    axis.ticks.y = element_blank()
+    ) +
+  scale_x_continuous(expand = c(0, 0))
+
+```
+
+

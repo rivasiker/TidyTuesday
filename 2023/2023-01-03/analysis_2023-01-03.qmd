@@ -1,0 +1,238 @@
+---
+title: "Untitled"
+format: html
+editor: visual
+---
+
+```{r}
+
+library(tidyverse)
+library(ggthemes)
+
+```
+
+```{r}
+
+
+
+a <- c('tidyverse
+ggthemes
+showtext
+tidyverse
+tidytuesdayR
+showtext
+geojsonio
+broom
+rgeos
+tidyverse
+tidytuesdayR
+showtext
+ggthemes
+tidyverse
+tidytuesdayR
+showtext
+ggthemes
+tidytuesdayR
+tidyverse
+colorspace
+patchwork
+showtext
+aRtsy
+tidyverse
+ggplot2
+ggforce
+grid
+tidyverse
+ggpattern
+patchwork
+ggforce
+tidytuesdayR
+tidyverse
+ggHoriPlot
+ggh4x
+ggthemes
+grid
+patchwork
+tidyverse
+ggHoriPlot
+stringi
+ggthemes
+ggh4x
+tidyverse
+ggthemes
+ggrepel
+showtext
+tidyverse
+ggthemes
+showtext
+geofacet
+ggrepel
+tidyverse
+ggthemes
+umap
+emo
+patchwork
+shiny
+tidyverse
+tidytuesdayR
+gt')
+
+lst <- str_split(a, '\n')[[1]]
+
+```
+
+
+```{r}
+
+integer_breaks <- function(n = 5, ...) {
+  fxn <- function(x) {
+    breaks <- floor(pretty(x, n, ...))
+    names(breaks) <- attr(breaks, "labels")
+    breaks
+  }
+  return(fxn)
+}
+
+package_plt <- tibble(package = lst) |> 
+  group_by(package) |> 
+  tally() |> 
+  mutate(
+    package = reorder(package, n)
+  ) |> 
+  ggplot() +
+  geom_col(aes(package, n), width = 1, color = 'black', fill = 'white') +
+  coord_flip() +
+  theme_minimal() +
+  scale_y_continuous(expand = c(0.01, 0), breaks = integer_breaks()) +
+  ggtitle('Packages') +
+  theme(
+    axis.title = element_blank()
+    ) 
+  
+
+```
+
+
+```{r}
+
+# dplyr_lst <- ls("package:dplyr")
+# dplyr_lst <- dplyr_lst[2:length(dplyr_lst)]
+# dplyr_lst[!str_detect(dplyr_lst, '^.*_$')] |> 
+#   paste(collapse = "\\(|") |> 
+#   cat()
+
+```
+
+```{r}
+
+dplyr_plt <- read_lines('./dplyr_func_2.txt') |> 
+  str_remove_all('\\(') %>%
+  tibble(fun = .) |> 
+  group_by(fun) |> 
+  tally() |> 
+  mutate(
+    fun = reorder(fun, n)
+  ) |> 
+  ggplot() +
+  geom_col(aes(fun, n), width = 1, color = 'black', fill = 'white') +
+  coord_flip() +
+  theme_minimal() +
+  scale_y_continuous(expand = c(0.01, 0), breaks = integer_breaks()) +
+  ggtitle('dplyr functions') +
+  theme(
+    axis.title = element_blank()
+    )
+
+```
+
+```{r}
+
+# find . -name "*.Rmd" -print0 | xargs -0 grep -rohE 'add_pattern'
+
+
+ggplot_lst <- ls("package:ggplot2")
+ggplot_lst <- ggplot_lst[2:length(ggplot_lst)]
+# ggplot_lst[!str_detect(ggplot_lst, '^.*_$')] |> 
+#   paste(collapse = "\\(|") |> 
+#   cat()
+
+```
+
+```{r fig.height=3}
+
+ggplot_dat <- read_lines('./ggplot2_func_2.txt') |> 
+  str_remove_all('\\(') %>%
+  tibble(fun = .) |> 
+  group_by(fun) |> 
+  tally() |> 
+  mutate(
+    fun = reorder(fun, n)
+  ) |> 
+  mutate(
+    group = case_when(
+      str_detect(fun, 'element_') ~ 'element',
+      str_detect(fun, 'geom_') ~ 'geom',
+      str_detect(fun, 'scale_') ~ 'scale',
+      str_detect(fun, 'theme') ~ 'theme',
+      TRUE ~ 'other'
+    )
+  ) |> 
+  group_by(group) |> 
+  mutate(
+    n2 = n()
+  ) |> 
+  ungroup() |> 
+  mutate(
+    Class = reorder(group, n2)
+  ) 
+
+ggplot_plt <- ggplot_dat |> 
+  ggplot() +
+  geom_col(aes(fun, n, fill = Class), color = 'black', width = 1) +
+  coord_flip() +
+  theme_minimal() +
+  scale_y_continuous(expand = c(0.01, 0), breaks = integer_breaks()) +
+  scale_fill_brewer(palette = "Set3") +
+  ggtitle('ggplot2 functions') +
+  theme(
+    legend.position = c(0.735, 0.8),
+    legend.title = element_blank(),
+    legend.background = element_rect(fill = 'white', color = 'white'),
+    axis.title = element_blank()
+    )
+  
+  
+
+```
+
+```{r fig.width=6, fig.height=4}
+
+library(patchwork)
+library(showtext)
+font_add_google("Courier Prime", "cou")
+showtext_auto()
+
+(((package_plt / dplyr_plt) | ggplot_plt) & 
+  theme(
+    text = element_text(family = 'cou'),
+    plot.title = element_text(hjust = 0.5)
+    )) + 
+  plot_annotation(
+    'Packages and functions used for TidyTuesday during 2023', 
+    'Number of occurrences of the loaded packages and the dplyr and ggplot2 functions\nduring the data wrangling and plotting of my TidyTuesday submissions',
+    '#TidyTuesday (2023, w1) | Graph by @irg_bio',
+    theme = theme(
+      title = element_text(size = 18),
+      plot.title = element_text(margin = margin(0,0,10,0)),
+      plot.subtitle = element_text(hjust = 0.5, margin = margin(0,0,10,0))
+      ))
+
+# ggsave('final_graph.png', width = 7, height = 5)
+
+```
+
+
+
+
+
+
