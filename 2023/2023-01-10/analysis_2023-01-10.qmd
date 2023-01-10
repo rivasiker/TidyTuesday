@@ -1,0 +1,166 @@
+---
+title: "Untitled"
+format: html
+editor: visual
+---
+
+```{r}
+
+library(tidyverse)
+library(ggthemes)
+
+```
+
+```{r}
+
+sp <- read_csv('PFW-species-translation-table.csv') 
+
+dat <- read_csv('PFW_2021_public.csv') |> 
+  left_join(sp, 'species_code')
+
+
+
+glimpse(dat)
+
+
+```
+
+```{r}
+
+dat |> 
+  group_by(species_code) |> 
+  summarise(
+    n = sum(how_many)
+  ) |> 
+  arrange(desc(n))
+
+```
+
+```{r}
+
+var_tab <- dat |> 
+  mutate(
+    date = as.Date(paste(Year, Month, '01', sep="-"), "%Y-%m-%d")
+    ) |> 
+  group_by(species_code, date) |> 
+  summarise(
+    lat = median(latitude),
+    lon = median(longitude),
+    n = sum(how_many)
+  )
+
+var_tab_selec <- var_tab |> 
+  group_by(species_code) |> 
+  summarise(
+    sd_lat = sd(lat),
+    sd_lon = sd(lon),
+    dif_lat = lat[date==as.Date('2020-11-01', "%Y-%m-%d")]-lat[date==as.Date('2021-04-01', "%Y-%m-%d")],
+    dif_lon = lon[date==as.Date('2020-11-01', "%Y-%m-%d")]-lon[date==as.Date('2021-04-01', "%Y-%m-%d")],
+    n = sum(n)
+  ) |> 
+  ungroup() |> 
+  filter(n > 100000) |> 
+  arrange(desc(abs(dif_lat))) |> 
+  top_n(6, abs(dif_lat))
+
+var_tab_selec <- var_tab |> 
+  group_by(species_code) |> 
+  summarise(
+    sd_lat = sd(lat),
+    sd_lon = sd(lon),
+    dif_lat = lat[date==as.Date('2020-11-01', "%Y-%m-%d")]-lat[date==as.Date('2021-04-01', "%Y-%m-%d")],
+    dif_lon = lon[date==as.Date('2020-11-01', "%Y-%m-%d")]-lon[date==as.Date('2021-04-01', "%Y-%m-%d")],
+    n = sum(n)
+  ) |> 
+  ungroup() |> 
+  filter(n > 100000) |> 
+  arrange(desc(n)) |> 
+  top_n(6, n)
+
+var_tab_selec
+
+```
+
+
+
+```{r}
+
+library(gganimate)
+
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(sf)
+library(ggrepel)
+
+
+loc_filt <- dat |> 
+  filter(
+    species_code %in% var_tab_selec$species_code,
+    between(longitude, -100, -60),
+    between(latitude, 30, 55)
+  ) |> 
+  mutate(
+    date = as.Date(paste(Year, Month, Day, sep="-"), "%Y-%m-%d")
+    ) |> 
+  group_by(date, species_code) |> 
+  mutate(n_2 = n()) |> 
+  filter(n_2 > 20) 
+  # rowwise() |> 
+  # summarise(
+  #   longitude = rep(longitude, how_many), 
+  #   latitude = rep(latitude, how_many), 
+  #   american_english_name = rep(american_english_name, how_many)
+  # ) |> 
+  # ungroup() 
+
+
+world_map <- ne_countries(scale = "small", returnclass = "sf", continent = c('North America', 'South America'))
+states_map <- ne_states(returnclass = "sf", country = c('United States of America', 'Canada'))
+
+
+theme_set(theme_few())
+
+p <- loc_filt |> 
+  ggplot() + 
+  geom_density_2d_filled(aes(longitude, latitude), 
+                         color = NA) +
+  geom_sf(
+    mapping = aes(), 
+    fill = NA, 
+    color = 'white',
+    data = world_map) +
+  scale_x_continuous(limits = c(-100, -60), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(30, 55), expand = c(0, 0)) +
+  theme(
+    legend.position = 'none',
+    axis.title.x=element_blank(),
+    axis.text.x=element_blank(),
+    axis.ticks.x=element_blank(),
+    axis.title.y=element_blank(),
+    axis.text.y=element_blank(),
+    axis.ticks.y=element_blank()
+  ) +
+  facet_wrap(~american_english_name) +
+  transition_states(
+    date, 
+    transition_length = 0,
+    state_length = 1
+  ) +
+  labs(
+    title = 'Bird sightings around Northeastern US from November 2020 to April 2021',
+    subtitle = 'Date: {closest_state}',
+    caption = '#TidyTuesday (2023, w2) | Data from Project FeederWatch | Graph by @irg_bio') +
+  NULL
+
+animate(p, end_pause = 20, height = 500,
+  width = 714, units = "px")
+
+anim_save('final_graph.gif')
+
+```
+
+
+
+
+
+
