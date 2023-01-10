@@ -9,6 +9,10 @@ project.
 Submissions
 ================
 
+## 2023-01-10
+
+![Project FeederWatch](https://github.com/rivasiker/TidyTuesday/blob/main/2023/2023-01-10/final_graph.gif)
+
 ## 2023-01-03
 
 ![2023 recap](https://github.com/rivasiker/TidyTuesday/blob/main/2023/2023-01-03/final_graph.png)
