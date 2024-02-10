@@ -8,20 +8,23 @@ editor: visual
 
 library(tidyverse)
 library(ggthemes)
+library(gganimate)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(sf)
 
 ```
 
 ```{r}
+
+# Downloaded from https://feederwatch.org/explore/raw-dataset-requests/
 
 sp <- read_csv('PFW-species-translation-table.csv') 
 
 dat <- read_csv('PFW_2021_public.csv') |> 
   left_join(sp, 'species_code')
 
-
-
 glimpse(dat)
-
 
 ```
 
@@ -52,20 +55,8 @@ var_tab <- dat |>
 var_tab_selec <- var_tab |> 
   group_by(species_code) |> 
   summarise(
-    sd_lat = sd(lat),
-    sd_lon = sd(lon),
-    dif_lat = lat[date==as.Date('2020-11-01', "%Y-%m-%d")]-lat[date==as.Date('2021-04-01', "%Y-%m-%d")],
-    dif_lon = lon[date==as.Date('2020-11-01', "%Y-%m-%d")]-lon[date==as.Date('2021-04-01', "%Y-%m-%d")],
-    n = sum(n)
-  ) |> 
-  ungroup() |> 
-  filter(n > 100000) |> 
-  arrange(desc(abs(dif_lat))) |> 
-  top_n(6, abs(dif_lat))
-
-var_tab_selec <- var_tab |> 
-  group_by(species_code) |> 
-  summarise(
+    min_lat = min(lat),
+    max_lat = max(lat),
     sd_lat = sd(lat),
     sd_lon = sd(lon),
     dif_lat = lat[date==as.Date('2020-11-01', "%Y-%m-%d")]-lat[date==as.Date('2021-04-01', "%Y-%m-%d")],
@@ -75,22 +66,33 @@ var_tab_selec <- var_tab |>
   ungroup() |> 
   filter(n > 100000) |> 
   arrange(desc(n)) |> 
-  top_n(6, n)
+  top_n(6, abs(dif_lat))
 
 var_tab_selec
 
 ```
 
+```{r}
+
+dat |> 
+  filter(american_english_name == 'American Robin') |> 
+  ggplot() +
+  geom_point(aes(longitude, latitude),
+    alpha = 0.005) +
+  geom_sf(
+    mapping = aes(), 
+    fill = NA, 
+    color = 'black',
+    data = world_map)
+
+```
+
+
 
 
 ```{r}
 
-library(gganimate)
 
-library(rnaturalearth)
-library(rnaturalearthdata)
-library(sf)
-library(ggrepel)
 
 
 loc_filt <- dat |> 
@@ -100,18 +102,16 @@ loc_filt <- dat |>
     between(latitude, 30, 55)
   ) |> 
   mutate(
-    date = as.Date(paste(Year, Month, Day, sep="-"), "%Y-%m-%d")
+    date = as.Date(paste(Year, Month, Day, sep="-"), "%Y-%m-%d"),
+    week = strftime(date, format = "%V")
     ) |> 
-  group_by(date, species_code) |> 
+  unite('week', c(Year, week), sep = ', week ') |> 
+  mutate(week = ifelse(week == "2021, week 53", "2020, week 53", week)) |> 
+  group_by(week, species_code) |> 
   mutate(n_2 = n()) |> 
-  filter(n_2 > 20) 
-  # rowwise() |> 
-  # summarise(
-  #   longitude = rep(longitude, how_many), 
-  #   latitude = rep(latitude, how_many), 
-  #   american_english_name = rep(american_english_name, how_many)
-  # ) |> 
-  # ungroup() 
+  filter(n_2 > 10) |> 
+  group_by(week) |> 
+  filter(length(unique(species_code)) == 6)
 
 
 world_map <- ne_countries(scale = "small", returnclass = "sf", continent = c('North America', 'South America'))
@@ -142,13 +142,13 @@ p <- loc_filt |>
   ) +
   facet_wrap(~american_english_name) +
   transition_states(
-    date, 
+    week, 
     transition_length = 0,
     state_length = 1
   ) +
   labs(
-    title = 'Bird sightings around Northeastern US from November 2020 to April 2021',
-    subtitle = 'Date: {closest_state}',
+    title = 'Weekly bird sightings around Northeastern US from November 2020 to April 2021',
+    subtitle = '{closest_state}',
     caption = '#TidyTuesday (2023, w2) | Data from Project FeederWatch | Graph by @irg_bio') +
   NULL
 
